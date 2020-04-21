@@ -1,0 +1,38 @@
+pipeline {
+    agent any 
+    stages {
+        stage('Docker Build') {
+            steps {
+                echo 'building docker'
+		sh 'docker build -t 036403281044.dkr.ecr.us-east-1.amazonaws.com/maithely:$(git rev-parse HEAD) .'
+            }
+        }
+         stage('pushing image to ECR') {
+             steps {
+                 echo 'pushing image'
+		 sh 'docker push 036403281044.dkr.ecr.us-east-1.amazonaws.com/maithely:$(git rev-parse HEAD)'
+             }
+         }
+         stage('Deploying on eks') {
+             steps {
+                 	echo 'deploying on eks'
+		 	sh 'kubectl create -f deployment.yml'
+		 	sh 'sleep 10'
+		 	sh 'kubectl get pods'
+		 	sh 'kubectl create -f loadbalancer.yml'
+		 	sh 'sleep 5'
+		 	sh 'kubectl get svc'
+		 	sh 'kubectl describe pods'
+             }
+         }
+    }
+	post {
+        success {
+            emailext body: 'Its a success', recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']], subject: 'success build'
+        }
+        failure {
+            emailext body: 'Its a failed', recipientProviders: [[$class: 'DevelopersRecipientProvider'], [$class: 'RequesterRecipientProvider']], subject: 'failed build'
+        }
+    }
+    
+}
